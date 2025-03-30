@@ -1,0 +1,16 @@
+{
+  "name": "qbitcleaner",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "dotenv -e .env.local -- nodemon src/index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv-cli": "^8.0.0",
+    "nodemon": "^3.1.9"
+  }
+}
