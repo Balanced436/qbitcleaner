@@ -3,7 +3,7 @@
  */
 const QBIT_PORT = process.env.QBIT_PORT;
 const QBIT_IP = process.env.QBIT_IP;
-const QBIT_TRACKER_STATUS = process.env.QBIT_TRACKER_STATUS.toUpperCase();
+const QBIT_TRACKER_STATUS = process.env.QBIT_TRACKER_STATUS.replaceAll(" ","").split(",").map((state)=>state.toUpperCase());
 const QBIT_POLLING_INTERVAL = process.env.QBIT_POLLING_INTERVAL;
 const QBIT_USERNAME = process.env.QBIT_USERNAME
 const QBIT_PASSWORD = process.env.QBIT_PASSWORD
@@ -96,6 +96,6 @@ setInterval(async () => {
         throw new Error("Expected torrentsInfos to be an array");
     }
 
-    const filteredTorrents = torrentsInfos.filter((torrentInfo)=>torrentInfo.state.toUpperCase() === QBIT_TRACKER_STATUS)
+    const filteredTorrents = torrentsInfos.filter((torrentInfo)=>QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()))
     console.info(filteredTorrents.map((torrent)=>torrent.name))
 }, QBIT_POLLING_INTERVAL * 1000)
