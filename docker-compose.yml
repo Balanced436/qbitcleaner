@@ -1,0 +1,26 @@
+services:
+  qbitcleaner:
+    container_name: qbitfixer
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: said287/qbitfixer
+    environment:
+      QBIT_USERNAME: "${QBIT_USERNAME}"
+      QBIT_PASSWORD: "${QBIT_PASSWORD}"
+      QBIT_TORRENTS_INFOS_ENDPOINT: "${QBIT_TORRENTS_INFOS_ENDPOINT}"
+      QBIT_LOGIN_ENDPOINT: "${QBIT_LOGIN_ENDPOINT}"
+    ports:
+      - 8000:8000
+    develop:
+        watch:
+          - action: sync
+            path: src
+            target: /app/src
+          
+
+     
+
+
+
+    
