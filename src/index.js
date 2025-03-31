@@ -1,3 +1,5 @@
+const { exec } = require('child_process');
+
 /**
  * Read environment variables
  */
@@ -97,5 +99,15 @@ setInterval(async () => {
     }
 
     const filteredTorrents = torrentsInfos.filter((torrentInfo)=>QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()))
+    if (filteredTorrents.length > 0){
+        exec('docker restart qbittorrent', (error, stdout, stderr) => {
+            if (error) {
+              console.error(`exec error: ${error}`);
+              return;
+            }
+            console.log(`stdout: ${stdout}`);
+            console.error(`stderr: ${stderr}`);
+          });
+    }
     console.info(filteredTorrents.map((torrent)=>torrent.name))
 }, QBIT_POLLING_INTERVAL * 1000)
