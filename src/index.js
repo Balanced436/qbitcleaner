@@ -5,10 +5,11 @@ const { exec } = require('child_process');
  */
 const QBIT_PORT = process.env.QBIT_PORT;
 const QBIT_IP = process.env.QBIT_IP;
-const QBIT_TRACKER_STATUS = process.env.QBIT_TRACKER_STATUS.replaceAll(" ","").split(",").map((state)=>state.toUpperCase());
+const QBIT_TRACKER_STATUS = process.env.QBIT_TRACKER_STATUS.replaceAll(" ", "").split(",").map((state) => state.toUpperCase());
 const QBIT_POLLING_INTERVAL = process.env.QBIT_POLLING_INTERVAL;
 const QBIT_USERNAME = process.env.QBIT_USERNAME
 const QBIT_PASSWORD = process.env.QBIT_PASSWORD
+const QBIT_CONTAINER_NAME = process.env.QBIT_CONTAINER_NAME
 
 
 /**
@@ -20,7 +21,8 @@ const requiredEnvVars = {
     QBIT_TRACKER_STATUS: "the tracker status to filter torrents",
     QBIT_POLLING_INTERVAL: "the polling interval in minutes",
     QBIT_USERNAME: "the username for qBittorrent authentication",
-    QBIT_PASSWORD: "the password for qBittorrent authentication"
+    QBIT_PASSWORD: "the password for qBittorrent authentication",
+    QBIT_CONTAINER_NAME: "the qbit container name"
 };
 
 /**
@@ -36,9 +38,6 @@ for (const [key, description] of Object.entries(requiredEnvVars)) {
 const QBIT_TORRENTS_INFOS_ENDPOINT = `http://${QBIT_IP}:${QBIT_PORT}/api/v2/torrents/info`
 const QBIT_LOGIN_ENDPOINT = `http://${QBIT_IP}:${QBIT_PORT}/api/v2/auth/login`
 
-console.info("QBIT_TORRENTS_INFOS_ENDPOINT", QBIT_TORRENTS_INFOS_ENDPOINT)
-console.info("QBIT_LOGIN_ENDPOINT", QBIT_LOGIN_ENDPOINT)
-
 /**
  * Logs in a user by sending their credentials to the specified api/v2/auth.
  *
@@ -46,26 +45,37 @@ console.info("QBIT_LOGIN_ENDPOINT", QBIT_LOGIN_ENDPOINT)
  * @param {string} password - The password of the user.
  */
 const login = async (username, password) => {
-    console.info(`${new Date().toLocaleDateString('fr')}: login`)
-    const searchParams = new URLSearchParams()
-    searchParams.append("username", username)
-    searchParams.append("password", password)
-    const loginHeaders = new Headers()
-    loginHeaders.append("Content-Type", "application/x-www-form-urlencoded");
-
-    const logionOptions = {
-        method: "POST",
-        headers: loginHeaders,
-        body: searchParams,
-        redirect: "follow"
-
+    try {
+        console.info(`${new Date().toLocaleString()}: Attempting to connect to ${QBIT_LOGIN_ENDPOINT} with provided credentials`);
+        const searchParams = new URLSearchParams();
+        searchParams.append("username", username);
+        searchParams.append("password", password);
+    
+        const loginHeaders = new Headers();
+        loginHeaders.append("Content-Type", "application/x-www-form-urlencoded");
+    
+        const logionOptions = {
+            method: "POST",
+            headers: loginHeaders,
+            body: searchParams,
+            redirect: "follow"
+        };
+    
+        const response = await fetch(`${QBIT_LOGIN_ENDPOINT}`, logionOptions);
+        if (response.ok) {
+            const cookies = response.headers.get('set-cookie');
+            if (!cookies) {
+                throw new Error("INVALID_CREDENTIALS");
+            }
+            return { response, cookies };
+        }
+    } catch (error) {
+        if (error.message === "INVALID_CREDENTIALS") {
+            throw new Error(`${new Date().toLocaleString()}: Invalid credentials provided`);
+        } else{
+            throw new Error(`${new Date().toLocaleString()}: QBIT is not reachable`);
+        } 
     }
-    const response = await fetch(`${QBIT_LOGIN_ENDPOINT}`, logionOptions);
-    if (response.ok) {
-        const cookies = response.headers.get('set-cookie');
-        return { response, cookies };
-    }
-    throw new Error('Login failed');
 };
 
 
@@ -75,7 +85,6 @@ const login = async (username, password) => {
  * @param {string} cookies
  */
 const getTorrentInfos = async (cookies) => {
-    console.info(`${new Date().toLocaleDateString('fr')}: getTorrentInfos`)
     const headers = new Headers
     headers.append("Cookie", cookies);
     const options = {
@@ -86,28 +95,44 @@ const getTorrentInfos = async (cookies) => {
     if (response.ok) {
         return await response.json()
     } else {
-        throw Error("Get torrents infos failed")
+        throw Error(`${new Date().toLocaleString()}: get torrents info failed`)
     }
 }
 
-setInterval(async () => {
-    const { cookies } = await login(QBIT_USERNAME, QBIT_PASSWORD)
-    const torrentsInfos = await getTorrentInfos(cookies);
-
-    if (!Array.isArray(torrentsInfos)) {
-        throw new Error("Expected torrentsInfos to be an array");
-    }
-
-    const filteredTorrents = torrentsInfos.filter((torrentInfo)=>QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()))
-    if (filteredTorrents.length > 0){
-        exec('docker restart qbittorrent', (error, stdout, stderr) => {
+const restartDockerContainer = ()=>{
+    return new Promise((resolve, reject) => {
+        exec(`docker restart ${QBIT_CONTAINER_NAME}`, (error, stdout, stderr) => {
             if (error) {
-              console.error(`exec error: ${error}`);
-              return;
+                resolve(1)
+            } else {
+                resolve(0)
             }
-            console.log(`stdout: ${stdout}`);
-            console.error(`stderr: ${stderr}`);
-          });
+        });
+    })
+
+}
+
+setInterval(async () => {
+    try {
+        const { cookies } = await login(QBIT_USERNAME, QBIT_PASSWORD)
+        console.info(`${new Date().toLocaleString()}: Successfully connected as ${QBIT_USERNAME}`)
+        const torrentsInfos = await getTorrentInfos(cookies);
+        const filteredTorrents = torrentsInfos.filter((torrentInfo) => QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()))
+        if (filteredTorrents.length > 0) {
+            console.info(`${new Date().toLocaleString()}: Found ${filteredTorrents.length} Torrent(s) matching the specified tracker statuses.`)
+            console.info(`${new Date().toLocaleString()}: ${filteredTorrents.map((torrent) => torrent.name)}`)
+            console.info(`${new Date().toLocaleString()}: the container ${QBIT_CONTAINER_NAME} will restart`)
+            const error = await restartDockerContainer()
+            if (error) {
+                throw Error(`${new Date().toLocaleString()}: Failed to restart the container ${QBIT_CONTAINER_NAME}`)
+            }else {
+                console.info(`${new Date().toLocaleString()}: Successfully restarted the container ${QBIT_CONTAINER_NAME}\n`)
+            }
+        } else{
+            console.info(`${new Date().toLocaleString()}: No torrents matched the specified tracker statuses :(${QBIT_TRACKER_STATUS})\n`)
+        }
+    } catch (error) {
+        console.error(`${error}\n`)
     }
-    console.info(filteredTorrents.map((torrent)=>torrent.name))
-}, QBIT_POLLING_INTERVAL * 1000)
+
+}, QBIT_POLLING_INTERVAL * 5000)

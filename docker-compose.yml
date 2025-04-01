@@ -12,6 +12,7 @@ services:
       QBIT_IP : "${QBIT_IP}"
       QBIT_TRACKER_STATUS : "${QBIT_TRACKER_STATUS}"
       QBIT_POLLING_INTERVAL : "${QBIT_POLLING_INTERVAL}"
+      QBIT_CONTAINER_NAME: "${QBIT_CONTAINER_NAME}"
     ports:
       - 8000:8000
     volumes:
@@ -19,6 +20,6 @@ services:
     restart: unless-stopped
     develop:
         watch:
-          - action: sync
+          - action: sync+restart
             path: src
             target: /app/src
