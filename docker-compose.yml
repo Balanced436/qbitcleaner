@@ -14,15 +14,11 @@ services:
       QBIT_POLLING_INTERVAL : "${QBIT_POLLING_INTERVAL}"
     ports:
       - 8000:8000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
     develop:
         watch:
           - action: sync
             path: src
             target: /app/src
-          
-
-     
-
-
-
-    
