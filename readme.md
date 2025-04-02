@@ -11,7 +11,7 @@ Follow these steps to set up Qbitfixer using Portainer:
 ```yaml
 services:
     qbitcleaner:
-        container_name: qbitcleaner
+        container_name: qbitfixer
         image: said287/qbitfixer
         environment:
             QBIT_USERNAME: "${QBIT_USERNAME}" # qBittorrent username
