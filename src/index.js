@@ -10,7 +10,10 @@ const QBIT_POLLING_INTERVAL = process.env.QBIT_POLLING_INTERVAL;
 const QBIT_USERNAME = process.env.QBIT_USERNAME
 const QBIT_PASSWORD = process.env.QBIT_PASSWORD
 const QBIT_CONTAINER_NAME = process.env.QBIT_CONTAINER_NAME
+const DISCORD_API_WEBHOOK = process.env.DISCORD_API_WEBHOOK
 
+const RED = 16711680
+const GREEN = 5763719
 
 /**
  * Check that env variables are provided
@@ -50,17 +53,17 @@ const login = async (username, password) => {
         const searchParams = new URLSearchParams();
         searchParams.append("username", username);
         searchParams.append("password", password);
-    
+
         const loginHeaders = new Headers();
         loginHeaders.append("Content-Type", "application/x-www-form-urlencoded");
-    
+
         const logionOptions = {
             method: "POST",
             headers: loginHeaders,
             body: searchParams,
             redirect: "follow"
         };
-    
+
         const response = await fetch(`${QBIT_LOGIN_ENDPOINT}`, logionOptions);
         if (response.ok) {
             const cookies = response.headers.get('set-cookie');
@@ -72,9 +75,9 @@ const login = async (username, password) => {
     } catch (error) {
         if (error.message === "INVALID_CREDENTIALS") {
             throw new Error(`${new Date().toLocaleString()}: Invalid credentials provided`);
-        } else{
+        } else {
             throw new Error(`${new Date().toLocaleString()}: QBIT is not reachable`);
-        } 
+        }
     }
 };
 
@@ -99,7 +102,7 @@ const getTorrentInfos = async (cookies) => {
     }
 }
 
-const restartDockerContainer = ()=>{
+const restartDockerContainer = () => {
     return new Promise((resolve, reject) => {
         exec(`docker restart ${QBIT_CONTAINER_NAME}`, (error, stdout, stderr) => {
             if (error) {
@@ -109,6 +112,40 @@ const restartDockerContainer = ()=>{
             }
         });
     })
+
+}
+
+const sendMessageToDiscord = async (message, url, color) => {
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+        "embeds": [
+          {
+            "description": message,
+            "color": color
+          }
+        ]
+      });
+      
+      const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: raw,
+        redirect: "follow"
+      };
+      
+
+    try {
+        const response = await fetch(url, requestOptions)
+        if (!response.status === 204) {
+            throw Error("NOT_VALID")
+        }
+        return response.status
+
+    } catch (error) {
+        throw Error(`${new Date().toLocaleString()}: An error occurred while sending a message to Discord: ${error.message}`);
+    }
 
 }
 
@@ -122,13 +159,28 @@ setInterval(async () => {
             console.info(`${new Date().toLocaleString()}: Found ${filteredTorrents.length} Torrent(s) matching the specified tracker statuses.`)
             console.info(`${new Date().toLocaleString()}: ${filteredTorrents.map((torrent) => torrent.name)}`)
             console.info(`${new Date().toLocaleString()}: the container ${QBIT_CONTAINER_NAME} will restart`)
+
+            // send messages to discord
+            if (DISCORD_API_WEBHOOK) {
+                try {
+                    console.info(`${new Date().toLocaleString()}: Trying to send a notification to discord\n`)
+                    const formattedTorrents = filteredTorrents.map((torrent) => `**Name:** ${torrent.name}\n**Hash:** ${torrent.hash}\n**State:** ${torrent.state}\n`).join("\n")
+                    await sendMessageToDiscord(`**Blocked torrents detected on qBittorrent instance ${QBIT_IP}**:\n ${formattedTorrents}`, DISCORD_API_WEBHOOK, RED)
+                    console.info(`${new Date().toLocaleString()}: Successfully notified Discord\n`)
+                } catch (error) {
+                    console.error(`${error}\n`)
+                }
+            }
+            // try to restart docker container
             const error = await restartDockerContainer()
             if (error) {
+                await sendMessageToDiscord(`Failed to restart ${QBIT_CONTAINER_NAME} on ${QBIT_IP}`, DISCORD_API_WEBHOOK, RED)
                 throw Error(`${new Date().toLocaleString()}: Failed to restart the container ${QBIT_CONTAINER_NAME}`)
-            }else {
+            } else {
+                await sendMessageToDiscord(`Successfully restarted ${QBIT_CONTAINER_NAME} on ${QBIT_IP}`, DISCORD_API_WEBHOOK, GREEN)
                 console.info(`${new Date().toLocaleString()}: Successfully restarted the container ${QBIT_CONTAINER_NAME}\n`)
             }
-        } else{
+        } else {
             console.info(`${new Date().toLocaleString()}: No torrents matched the specified tracker statuses :(${QBIT_TRACKER_STATUS})\n`)
         }
     } catch (error) {
