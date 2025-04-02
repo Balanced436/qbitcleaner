@@ -187,4 +187,4 @@ setInterval(async () => {
         console.error(`${error}\n`)
     }
 
-}, QBIT_POLLING_INTERVAL * 5000)
+}, QBIT_POLLING_INTERVAL * 1000 * 60)
