@@ -98,7 +98,7 @@ const getTorrentInfos = async (cookies) => {
     if (response.ok) {
         return await response.json()
     } else {
-        throw Error(`${new Date().toLocaleString()}: get torrents info failed`)
+        throw Error(`${new Date().toLocaleString()}: Get torrents info failed`)
     }
 }
 

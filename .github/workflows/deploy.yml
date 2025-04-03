@@ -1,0 +1,23 @@
+name: Push image on dockerhub
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: docker login
+      env:
+        DOCKER_USER: said287
+        DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+      run: |
+        docker login -u said287 -p $DOCKER_PASSWORD 
+    - name: Build the Docker image
+      run: docker compose build
+      
+    - name: Docker Push
+      run: docker push said287/qbitfixer
