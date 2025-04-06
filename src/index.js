@@ -7,10 +7,21 @@ const QBIT_PORT = process.env.QBIT_PORT;
 const QBIT_IP = process.env.QBIT_IP;
 const QBIT_TRACKER_STATUS = process.env.QBIT_TRACKER_STATUS.replaceAll(" ", "").split(",").map((state) => state.toUpperCase());
 const QBIT_POLLING_INTERVAL = process.env.QBIT_POLLING_INTERVAL;
-const QBIT_USERNAME = process.env.QBIT_USERNAME
-const QBIT_PASSWORD = process.env.QBIT_PASSWORD
-const QBIT_CONTAINER_NAME = process.env.QBIT_CONTAINER_NAME
-const DISCORD_API_WEBHOOK = process.env.DISCORD_API_WEBHOOK
+const QBIT_USERNAME = process.env.QBIT_USERNAME;
+const QBIT_PASSWORD = process.env.QBIT_PASSWORD;
+const QBIT_CONTAINER_NAME = process.env.QBIT_CONTAINER_NAME;
+const DISCORD_API_WEBHOOK = process.env.DISCORD_API_WEBHOOK;
+const QBIT_EXCLUDE_TAG = process.env.QBIT_EXCLUDE_TAG.replaceAll(" ", "").split(",").map((tag) => tag.toUpperCase());
+
+console.info("QBIT_PORT:", QBIT_PORT);
+console.info("QBIT_IP:", QBIT_IP);
+console.info("QBIT_TRACKER_STATUS:", QBIT_TRACKER_STATUS);
+console.info("QBIT_POLLING_INTERVAL:", QBIT_POLLING_INTERVAL);
+console.info("QBIT_USERNAME:", QBIT_USERNAME);
+console.info("QBIT_PASSWORD:", "*****");
+console.info("QBIT_CONTAINER_NAME:", QBIT_CONTAINER_NAME);
+console.info("DISCORD_API_WEBHOOK:", DISCORD_API_WEBHOOK);
+console.info("QBIT_EXCLUDE_TAG:", QBIT_EXCLUDE_TAG);
 
 const RED = 16711680
 const GREEN = 5763719
@@ -121,20 +132,20 @@ const sendMessageToDiscord = async (message, url, color) => {
 
     const raw = JSON.stringify({
         "embeds": [
-          {
-            "description": message,
-            "color": color
-          }
+            {
+                "description": message,
+                "color": color
+            }
         ]
-      });
-      
-      const requestOptions = {
+    });
+
+    const requestOptions = {
         method: "POST",
         headers: myHeaders,
         body: raw,
         redirect: "follow"
-      };
-      
+    };
+
 
     try {
         const response = await fetch(url, requestOptions)
@@ -154,8 +165,16 @@ setInterval(async () => {
         const { cookies } = await login(QBIT_USERNAME, QBIT_PASSWORD)
         console.info(`${new Date().toLocaleString()}: Successfully connected as ${QBIT_USERNAME}`)
         const torrentsInfos = await getTorrentInfos(cookies);
-        const filteredTorrents = torrentsInfos.filter((torrentInfo) => QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()))
+        const filteredTorrents = torrentsInfos.filter((torrentInfo) =>
+            QBIT_TRACKER_STATUS.includes(torrentInfo.state.toUpperCase()) &&
+            !(QBIT_EXCLUDE_TAG &&
+                QBIT_EXCLUDE_TAG.some((tag) =>
+                    torrentInfo.tags.replaceAll(" ", "").split(",").map((torrentTag) => torrentTag.toUpperCase()).includes(tag)
+                )
+            )
+        );
         if (filteredTorrents.length > 0) {
+            console.info(`${new Date().toLocaleString()}: Excluded tags ${QBIT_EXCLUDE_TAG}`)
             console.info(`${new Date().toLocaleString()}: Found ${filteredTorrents.length} Torrent(s) matching the specified tracker statuses.`)
             console.info(`${new Date().toLocaleString()}: ${filteredTorrents.map((torrent) => torrent.name)}`)
             console.info(`${new Date().toLocaleString()}: the container ${QBIT_CONTAINER_NAME} will restart`)
@@ -164,7 +183,7 @@ setInterval(async () => {
             if (DISCORD_API_WEBHOOK) {
                 try {
                     console.info(`${new Date().toLocaleString()}: Trying to send a notification to discord\n`)
-                    const formattedTorrents = filteredTorrents.map((torrent) => `**Name:** ${torrent.name}\n**Hash:** ${torrent.hash}\n**State:** ${torrent.state}\n`).join("\n")
+                    const formattedTorrents = filteredTorrents.map((torrent) => `**Name:** ${torrent.name}\n**Hash:** ${torrent.hash}\n**State:** ${torrent.state}\n**Tags:** ${torrent.tags ? torrent.tags : "No tags"}\n`).join("\n")
                     await sendMessageToDiscord(`**Blocked torrents detected on qBittorrent instance ${QBIT_IP}**:\n ${formattedTorrents}`, DISCORD_API_WEBHOOK, RED)
                     console.info(`${new Date().toLocaleString()}: Successfully notified Discord\n`)
                 } catch (error) {
