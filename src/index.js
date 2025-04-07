@@ -11,7 +11,7 @@ const QBIT_USERNAME = process.env.QBIT_USERNAME;
 const QBIT_PASSWORD = process.env.QBIT_PASSWORD;
 const QBIT_CONTAINER_NAME = process.env.QBIT_CONTAINER_NAME;
 const DISCORD_API_WEBHOOK = process.env.DISCORD_API_WEBHOOK;
-const QBIT_EXCLUDE_TAG = process.env.QBIT_EXCLUDE_TAG.replaceAll(" ", "").split(",").map((tag) => tag.toUpperCase());
+const QBIT_EXCLUDE_TAG = process.env.QBIT_EXCLUDE_TAG ? process.env.QBIT_EXCLUDE_TAG.replaceAll(" ", "").split(",").map((tag) => tag.toUpperCase()) : [''];
 
 console.info("QBIT_PORT:", QBIT_PORT);
 console.info("QBIT_IP:", QBIT_IP);
